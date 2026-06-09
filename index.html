@@ -1,0 +1,112 @@
+<!doctype html>
+<html lang="pt-br">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Gerenciador de Cookies - Interface Simples</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <main class="container">
+    <header class="hero">
+      <h1>Clínica OdontoEstética</h1>
+      <p>Gerencie agendamentos, preferências e sessão — utilizando cookies.</p>
+    </header>
+
+    <section class="panel" id="authPanel">
+      <h2>Entrar / Perfil</h2>
+      <label>Nome do paciente
+        <input id="userName" placeholder="Seu nome" />
+      </label>
+      <label>E-mail
+        <input id="userEmail" placeholder="seu@exemplo.com" />
+      </label>
+      <div class="buttons">
+        <button id="loginBtn">Entrar</button>
+        <button id="logoutBtn" class="secondary">Sair</button>
+        <button id="clearCookiesBtn" class="danger">Limpar cookies</button>
+      </div>
+      <div id="userInfo" class="result"></div>
+    </section>
+
+    <section class="panel" id="prefsPanel">
+      <h2>Preferências</h2>
+      <label>Tema
+        <select id="themeSelect">
+          <option value="light">Claro</option>
+          <option value="dark">Escuro</option>
+        </select>
+      </label>
+      <div class="buttons">
+        <button id="savePrefBtn">Salvar preferência</button>
+      </div>
+    </section>
+
+    <section class="panel" id="cookiesPanel">
+      <h2>Cookies</h2>
+      <div id="result" class="result"></div>
+      <table>
+        <thead>
+          <tr><th>Ação</th><th>Nome</th><th>Valor</th></tr>
+        </thead>
+        <tbody id="cookiesTable"></tbody>
+      </table>
+
+      <h3>Editar cookie</h3>
+      <label>Nome
+        <input id="cookieNameEdit" readonly />
+      </label>
+      <label>Valor
+        <input id="cookieValueEdit" />
+      </label>
+      <label>Expirar em (dias)
+        <input id="cookieDaysEdit" type="number" min="0" placeholder="7" />
+      </label>
+      <div class="buttons">
+        <button id="updateCookieBtn">Atualizar cookie</button>
+        <button id="deleteCookieBtn" class="danger">Excluir cookie</button>
+        <button id="refreshCookiesBtn" class="secondary">Atualizar lista</button>
+      </div>
+    </section>
+
+    <section class="panel" id="bookingPanel">
+      <h2>Agendar consulta</h2>
+      <label>Serviço
+        <select id="serviceSelect"></select>
+      </label>
+      <div class="service-price">Preço: <span id="servicePrice">R$ 0,00</span></div>
+      <label>Data e hora
+        <input id="dateTime" type="datetime-local" />
+      </label>
+      <div class="buttons">
+        <button id="bookBtn">Agendar</button>
+      </div>
+    </section>
+
+    <section class="panel" id="appointmentsPanel">
+      <h2>Meus agendamentos</h2>
+      <div id="appointmentsList" class="result">Nenhum agendamento.</div>
+    </section>
+
+    <section class="panel" id="professionalPanel">
+      <h2>Área do Profissional</h2>
+      <label>Senha do profissional
+        <input id="profPass" type="password" placeholder="senha" />
+      </label>
+      <div class="buttons">
+        <button id="profLoginBtn">Entrar como Profissional</button>
+        <button id="profLogoutBtn" class="secondary">Sair Profissional</button>
+      </div>
+
+      <div id="priceEditor" style="display:none;margin-top:12px">
+        <h3>Editar preços</h3>
+        <div id="pricesList"></div>
+        <div class="buttons"><button id="savePricesBtn">Salvar preços</button></div>
+      </div>
+    </section>
+
+    <footer class="note">Abra este arquivo no navegador. Para testes locais, prefira servidor estático.</footer>
+  </main>
+  <script src="script.js"></script>
+</body>
+</html>
