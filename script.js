@@ -1,7 +1,7 @@
 /*
   script.js
   Lógica principal do aplicativo: funções utilitárias, manipulação de cookies,
-  armazenamento de agendamentos (localStorage) e interação com a interface.
+  armazenamento de agendamentos (localStorage) e interação com a interface..
 
   Comentários explicam o propósito de cada função e onde são usadas.
 */
@@ -11,6 +11,7 @@ const COOKIE_NAME_USER = 'user';
 const COOKIE_NAME_THEME = 'theme';
 const COOKIE_NAME_ROLE = 'role';
 const COOKIE_NAME_LAST_APPOINTMENT = 'lastAppointment';
+
 
 
 /*
