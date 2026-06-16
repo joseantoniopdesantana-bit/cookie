@@ -20,4 +20,4 @@ python -m http.server
 
 Notas:
 - Cookies são manipulados via `document.cookie` (funções em `script.js`).
-- Para testes locais, prefira servidor para evitar limitações de caminho nos navegadores.
+- Para testes locais, prefira servidor para evitar limitações de caminho nos navegadores..
