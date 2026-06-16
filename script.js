@@ -1,61 +1,223 @@
+/*
+  script.js
+  Lógica principal do aplicativo: funções utilitárias, manipulação de cookies,
+  armazenamento de agendamentos (localStorage) e interação com a interface.
+
+  Comentários explicam o propósito de cada função e onde são usadas.
+*/
+
+/* Nomes de cookie usados pela aplicação */
+const COOKIE_NAME_USER = 'user';
+const COOKIE_NAME_THEME = 'theme';
+const COOKIE_NAME_ROLE = 'role';
+const COOKIE_NAME_LAST_APPOINTMENT = 'lastAppointment';
+
+
+/*
+  escapeHtml
+  Evita injeção de HTML ao renderizar nomes/valores vindos de cookies/localStorage.
+*/
+function escapeHtml(value) {
+  return String(value).replace(/[&<>"']/g, char => ({
+    '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+  })[char]);
+}
+
+
+/*
+  Funções de cookie: set, get e delete
+  - setCookie: grava cookie com opcional tempo de expiração (dias)
+  - getCookie: retorna o valor cru do cookie (decodificado) ou null
+  - deleteCookie: expira o cookie imediatamente
+*/
 function setCookie(name, value, days) {
   if (!name) return;
-  // Remover cookie existente com mesmo nome/path antes de definir
-  try { deleteCookie(name); } catch (e) {}
   let expires = '';
   if (days && Number(days) > 0) {
     const date = new Date();
     date.setTime(date.getTime() + Number(days) * 24 * 60 * 60 * 1000);
-    expires = '; expires=' + date.toUTCString();
+    expires = `; expires=${date.toUTCString()}`;
   }
-  document.cookie = encodeURIComponent(name) + '=' + encodeURIComponent(value || '') + expires + '; path=/';
+  document.cookie = `${encodeURIComponent(name)}=${encodeURIComponent(value || '')}${expires}; path=/`;
 }
 
 function getCookie(name) {
   const cookies = document.cookie ? document.cookie.split('; ') : [];
-  for (let c of cookies) {
-    const [k, ...v] = c.split('=');
-    if (decodeURIComponent(k) === name) return decodeURIComponent(v.join('='));
+  for (const cookie of cookies) {
+    const [key, ...valueParts] = cookie.split('=');
+    if (decodeURIComponent(key) === name) return decodeURIComponent(valueParts.join('='));
   }
   return null;
 }
 
 function deleteCookie(name) {
   if (!name) return;
-  document.cookie = encodeURIComponent(name) + '=; expires=Thu, 01 Jan 1970 00:00:00 GMT; path=/';
+  document.cookie = `${encodeURIComponent(name)}=; expires=Thu, 01 Jan 1970 00:00:00 GMT; path=/`;
 }
 
+
+/*
+  listCookies
+  Retorna um array com os cookies atuais (nome, valor) e atualiza a tabela
+  `cookiesTable` no DOM quando presente.
+*/
 function listCookies() {
-  const cookies = document.cookie ? document.cookie.split('; ').map(c => {
-    const [k, ...v] = c.split('=');
-    return { name: decodeURIComponent(k), value: decodeURIComponent(v.join('=')) };
+  const cookies = document.cookie ? document.cookie.split('; ').map(entry => {
+    const [key, ...valueParts] = entry.split('=');
+    return { name: decodeURIComponent(key), value: decodeURIComponent(valueParts.join('=')) };
   }) : [];
+
   const tbody = document.getElementById('cookiesTable');
-  if (!tbody) return cookies;
+  if (!tbody) return cookies; // usado em contextos não-UI também
+
   tbody.innerHTML = '';
-  for (let ck of cookies) {
+  cookies.forEach(ck => {
     const tr = document.createElement('tr');
-    tr.innerHTML = `<td><button data-name="${encodeURIComponent(ck.name)}" data-value="${encodeURIComponent(ck.value)}" class="smallEdit">Editar</button> <button data-name="${encodeURIComponent(ck.name)}" class="smallDel">Excluir</button></td><td>${escapeHtml(ck.name)}</td><td>${escapeHtml(ck.value)}</td>`;
+    tr.innerHTML = `
+      <td>
+        <button type="button" class="smallEdit" data-name="${encodeURIComponent(ck.name)}" data-value="${encodeURIComponent(ck.value)}">Editar</button>
+        <button type="button" class="smallDel" data-name="${encodeURIComponent(ck.name)}">Excluir</button>
+      </td>
+      <td>${escapeHtml(ck.name)}</td>
+      <td>${escapeHtml(ck.value)}</td>
+    `;
     tbody.appendChild(tr);
-  }
+  });
+
+  // liga os handlers dos botões gerados dinamicamente
   attachRowButtons();
   return cookies;
 }
 
-function clearAllCookies() {
-  const cookies = listCookies();
-  cookies.forEach(c => deleteCookie(c.name));
+/* remove todos os cookies visíveis */
+// Remove todos os cookies visíveis
+// Uso: ação de limpeza global (ex.: botão 'Limpar cookies')
+function clearAllCookies() { listCookies().forEach(c => deleteCookie(c.name)); }
+
+
+/*
+  getCookieObject
+  Se o cookie contém JSON, retorna o objeto. Caso contrário, null.
+*/
+function getCookieObject(name) {
+  const raw = getCookie(name);
+  if (!raw) return null;
+  try { return JSON.parse(raw); } catch { return null; }
 }
 
-function escapeHtml(s){
-  return String(s).replace(/[&<>"']/g, function(m){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m];});
+
+/*
+  showResult
+  Exibe mensagens de status na área apropriada (`#result` ou `#userInfo`).
+*/
+function showResult(msg) {
+  const el = document.getElementById('result') || document.getElementById('userInfo');
+  if (el) el.textContent = msg;
 }
 
-function attachRowButtons(){
+
+/*
+  Agendamentos: leitura e gravação em localStorage
+*/
+function loadAppointments() {
+  const raw = localStorage.getItem('appointments');
+  if (!raw) return [];
+  try { return JSON.parse(raw); } catch { return []; }
+}
+
+function saveAppointments(list) { localStorage.setItem('appointments', JSON.stringify(list)); }
+
+function renderAppointments() {
+  const el = document.getElementById('appointmentsList');
+  if (!el) return;
+  const list = loadAppointments();
+  if (!list.length) { el.textContent = 'Nenhum agendamento.'; return; }
+
+  el.innerHTML = '';
+  list.forEach(a => {
+    const item = document.createElement('div');
+    item.className = 'appointment';
+    item.textContent = `${a.service} — ${new Date(a.datetime).toLocaleString()} — R$ ${Number(a.price||0).toFixed(2)} (por ${a.name})`;
+    const del = document.createElement('button');
+    del.type = 'button'; del.textContent = 'Cancelar';
+    del.addEventListener('click', () => {
+      const rem = loadAppointments().filter(x => x.id !== a.id);
+      saveAppointments(rem);
+      showResult('Agendamento cancelado.');
+      renderAppointments();
+    });
+    item.appendChild(del);
+    el.appendChild(item);
+  });
+}
+
+
+/*
+  Serviços: valores padrão e persistência em localStorage
+*/
+function loadServices() {
+  const raw = localStorage.getItem('services');
+  if (!raw) return [
+    {id:'s1', name:'Consulta Odontológica', price:120.00},
+    {id:'s2', name:'Limpeza Dentária', price:80.00},
+    {id:'s3', name:'Tratamento Estético', price:200.00},
+    {id:'s4', name:'Preenchimento / Botox', price:350.00}
+  ];
+  try { return JSON.parse(raw); } catch { return []; }
+}
+
+function saveServices(list) { localStorage.setItem('services', JSON.stringify(list)); }
+
+function renderServiceOptions() {
+  const sel = document.getElementById('serviceSelect'); if (!sel) return;
+  sel.innerHTML = '';
+  loadServices().forEach(s => { const opt = document.createElement('option'); opt.value = s.id; opt.textContent = s.name; sel.appendChild(opt); });
+  updatePriceDisplay();
+}
+
+function updatePriceDisplay() {
+  const sel = document.getElementById('serviceSelect'); const priceEl = document.getElementById('servicePrice');
+  if (!sel || !priceEl) return null;
+  const s = loadServices().find(x => x.id === sel.value) || loadServices()[0];
+  if (s) priceEl.textContent = `R$ ${s.price.toFixed(2)}`;
+  return s;
+}
+
+
+/*
+  Área do profissional: controle de acesso simples via cookie 'role'
+*/
+function isProfessional() { return getCookie('role') === 'professional'; }
+
+function renderPricesEditor() {
+  const listEl = document.getElementById('pricesList'); if (!listEl) return;
+  listEl.innerHTML = '';
+  loadServices().forEach(s => {
+    const row = document.createElement('div'); row.className = 'price-row';
+    row.innerHTML = `<label>${escapeHtml(s.name)}<input data-id="${s.id}" class="priceInput" type="number" min="0" step="0.01" value="${s.price}" /></label>`;
+    listEl.appendChild(row);
+  });
+  // bloquear inputs quando não for profissional
+  listEl.querySelectorAll('.priceInput').forEach(i => i.disabled = !isProfessional());
+}
+
+function renderProfessionalArea() {
+  const editor = document.getElementById('priceEditor'); const pass = document.getElementById('profPass');
+  if (editor) editor.classList.toggle('hidden', !isProfessional());
+  if (pass) pass.value = '';
+  renderPricesEditor();
+}
+
+
+/*
+  attachRowButtons
+  Liga os botões 'Editar' e 'Excluir' gerados na tabela de cookies.
+*/
+function attachRowButtons() {
   document.querySelectorAll('.smallDel').forEach(btn => {
-    btn.removeEventListener && btn.removeEventListener('click', ()=>{});
     btn.addEventListener('click', e => {
       const name = decodeURIComponent(e.currentTarget.getAttribute('data-name'));
+      // Exclui o cookie especificado pelo usuário (ação na tabela de cookies)
       deleteCookie(name);
       showResult(`Cookie "${name}" removido.`);
       listCookies();
@@ -63,276 +225,115 @@ function attachRowButtons(){
   });
 
   document.querySelectorAll('.smallEdit').forEach(btn => {
-    btn.removeEventListener && btn.removeEventListener('click', ()=>{});
     btn.addEventListener('click', e => {
-      const name = decodeURIComponent(e.currentTarget.getAttribute('data-name'));
-      const value = decodeURIComponent(e.currentTarget.getAttribute('data-value') || '');
-      const nameField = document.getElementById('cookieNameEdit');
-      const valueField = document.getElementById('cookieValueEdit');
-      const daysField = document.getElementById('cookieDaysEdit');
-      if (nameField) nameField.value = name;
-      if (valueField) valueField.value = value;
-      if (daysField) daysField.value = '';
+      const t = e.currentTarget;
+      const name = decodeURIComponent(t.getAttribute('data-name'));
+      const value = decodeURIComponent(t.getAttribute('data-value') || '');
+      const nf = document.getElementById('cookieNameEdit');
+      const vf = document.getElementById('cookieValueEdit');
+      const df = document.getElementById('cookieDaysEdit');
+      if (nf) nf.value = name; if (vf) vf.value = value; if (df) df.value = '';
       showResult(`Editando cookie "${name}".`);
     });
   });
 }
 
-function showResult(txt){
-  const el = document.getElementById('result') || document.getElementById('userInfo');
-  if (el) el.textContent = txt;
-}
 
+/*
+  Inicialização: liga eventos e renderiza estados iniciais
+*/
 window.addEventListener('DOMContentLoaded', () => {
-  // Autenticação simples via cookie
   const userName = document.getElementById('userName');
   const userEmail = document.getElementById('userEmail');
   const loginBtn = document.getElementById('loginBtn');
   const logoutBtn = document.getElementById('logoutBtn');
   const clearCookiesBtn = document.getElementById('clearCookiesBtn');
-  const userInfo = document.getElementById('userInfo');
-
-  const themeSelect = document.getElementById('themeSelect');
   const savePrefBtn = document.getElementById('savePrefBtn');
-
-  const serviceSelect = document.getElementById('serviceSelect');
-  const dateTime = document.getElementById('dateTime');
-  const bookBtn = document.getElementById('bookBtn');
-  const appointmentsList = document.getElementById('appointmentsList');
-  const servicePrice = document.getElementById('servicePrice');
-  const profPass = document.getElementById('profPass');
+  const themeSelect = document.getElementById('themeSelect');
   const profLoginBtn = document.getElementById('profLoginBtn');
   const profLogoutBtn = document.getElementById('profLogoutBtn');
-  const priceEditor = document.getElementById('priceEditor');
-  const pricesList = document.getElementById('pricesList');
   const savePricesBtn = document.getElementById('savePricesBtn');
+  const bookBtn = document.getElementById('bookBtn');
 
-  function getUserFromCookie(){
-    const txt = getCookie('user');
-    if (!txt) return null;
-    try{ return JSON.parse(txt); }catch(e){ return null; }
+  function renderUser() {
+    const ui = document.getElementById('userInfo');
+    const u = getCookieObject('user');
+    if (!u) { if (ui) ui.textContent = 'Não autenticado.'; return; }
+    if (ui) ui.textContent = `Logado como ${u.name} (${u.email})`;
+    if (userName) userName.value = u.name; if (userEmail) userEmail.value = u.email;
   }
 
-  function renderUser(){
-    const u = getUserFromCookie();
-    if (u){
-      userInfo.textContent = `Logado como ${u.name} (${u.email})`;
-      userName.value = u.name;
-      userEmail.value = u.email;
-    } else {
-      userInfo.textContent = 'Não autenticado.';
-    }
-  }
-
-  loginBtn.addEventListener('click', ()=>{
-    const name = userName.value.trim();
-    const email = userEmail.value.trim();
+  if (loginBtn) loginBtn.addEventListener('click', () => {
+    const name = userName.value.trim(); const email = userEmail.value.trim();
     if (!name) { showResult('Informe seu nome.'); return; }
-    const obj = { name, email };
-    setCookie('user', JSON.stringify(obj), 7);
-    showResult('Sessão iniciada.');
-    renderUser();
+    // Cria/atualiza cookie 'user' contendo JSON com nome e email (duração: 7 dias)
+    setCookie('user', JSON.stringify({ name, email }), 7);
+    showResult('Sessão iniciada.'); renderUser();
   });
 
-  logoutBtn.addEventListener('click', ()=>{
-    deleteCookie('user');
-    showResult('Sessão encerrada.');
-    renderUser();
+  if (logoutBtn) logoutBtn.addEventListener('click', () => {
+    // Exclui cookie de sessão 'user' (logout)
+    deleteCookie('user'); showResult('Sessão encerrada.'); renderUser();
   });
+  if (clearCookiesBtn) clearCookiesBtn.addEventListener('click', () => { clearAllCookies(); showResult('Cookies limpos.'); renderUser(); });
 
-  clearCookiesBtn.addEventListener('click', ()=>{
-    clearAllCookies();
-    showResult('Cookies limpos.');
-    renderUser();
+  if (savePrefBtn) savePrefBtn.addEventListener('click', () => {
+    const t = themeSelect.value;
+    // Salva preferência de tema no cookie 'theme' (persistência por 365 dias)
+    setCookie('theme', t, 365);
+    document.documentElement.dataset.theme = t; showResult('Preferência salva.');
   });
+  if (themeSelect) themeSelect.addEventListener('change', () => { document.documentElement.dataset.theme = themeSelect.value; });
 
-  // Preferências
-  savePrefBtn.addEventListener('click', ()=>{
-    const theme = themeSelect.value;
-    setCookie('theme', theme, 365);
-    document.documentElement.setAttribute('data-theme', theme);
-    showResult('Preferência salva.');
-  });
-
-  // Agendamentos: armazenamos em localStorage e gravamos resumo no cookie lastAppointment
-  function loadAppointments(){
-    const raw = localStorage.getItem('appointments');
-    try{ return raw ? JSON.parse(raw) : []; }catch(e){ return []; }
-  }
-
-  function saveAppointments(list){
-    localStorage.setItem('appointments', JSON.stringify(list));
-  }
-
-  function renderAppointments(){
-    const list = loadAppointments();
-    if (!list.length){ appointmentsList.textContent = 'Nenhum agendamento.'; return; }
-    appointmentsList.innerHTML = '';
-    list.forEach(a => {
-      const el = document.createElement('div');
-      el.className = 'appointment';
-      el.textContent = `${a.service} — ${new Date(a.datetime).toLocaleString()} — R$ ${Number(a.price||0).toFixed(2)} (por ${a.name})`;
-      const del = document.createElement('button');
-      del.textContent = 'Cancelar';
-      del.addEventListener('click', ()=>{
-        const rem = loadAppointments().filter(x=>x.id!==a.id);
-        saveAppointments(rem);
-        showResult('Agendamento cancelado.');
-        renderAppointments();
-      });
-      el.appendChild(del);
-      appointmentsList.appendChild(el);
-    });
-  }
-
-  // Serviços e preços (persistidos em localStorage). Estrutura: [{id, name, price}]
-  function loadServices(){
-    const raw = localStorage.getItem('services');
-    if (!raw) return [
-      {id:'s1', name:'Consulta Odontológica', price:120.00},
-      {id:'s2', name:'Limpeza Dentária', price:80.00},
-      {id:'s3', name:'Tratamento Estético', price:200.00},
-      {id:'s4', name:'Preenchimento / Botox', price:350.00}
-    ];
-    try{ return JSON.parse(raw); }catch(e){ return []; }
-  }
-
-  function saveServices(list){
-    localStorage.setItem('services', JSON.stringify(list));
-  }
-
-  function renderServiceOptions(){
-    const list = loadServices();
-    serviceSelect.innerHTML = '';
-    list.forEach(s => {
-      const opt = document.createElement('option');
-      opt.value = s.id;
-      opt.textContent = s.name;
-      serviceSelect.appendChild(opt);
-    });
-    updatePriceDisplay();
-  }
-
-  function updatePriceDisplay(){
-    const list = loadServices();
-    const sel = serviceSelect.value;
-    const s = list.find(x=>x.id===sel) || list[0];
-    if (s && servicePrice) servicePrice.textContent = `R$ ${s.price.toFixed(2)}`;
-    return s;
-  }
-
-  serviceSelect && serviceSelect.addEventListener('change', updatePriceDisplay);
-
-  // Profissional: autenticação simples via senha e cookie 'role=professional'
-  function isProfessional(){ return getCookie('role')==='professional'; }
-
-  profLoginBtn && profLoginBtn.addEventListener('click', ()=>{
-    const pass = profPass.value || '';
-    // senha hardcoded para demonstração
-    if (pass === 'admin123'){
-      setCookie('role','professional',1);
-      showResult('Entrou como profissional.');
-      renderProfessionalArea();
+  if (profLoginBtn) profLoginBtn.addEventListener('click', () => {
+    const pass = document.getElementById('profPass').value || '';
+    if (pass === 'admin123') {
+      // Cria cookie 'role' = 'professional' para habilitar a área profissional (expira em 1 dia)
+      setCookie('role','professional',1); showResult('Entrou como profissional.'); renderProfessionalArea();
     } else showResult('Senha incorreta.');
   });
 
-  profLogoutBtn && profLogoutBtn.addEventListener('click', ()=>{
-    deleteCookie('role');
-    showResult('Saída do modo profissional.');
-    renderProfessionalArea();
+  if (profLogoutBtn) profLogoutBtn.addEventListener('click', () => {
+    // Remove a role profissional do cookie (revoga acesso)
+    deleteCookie('role'); showResult('Saída do modo profissional.'); renderProfessionalArea();
   });
 
-  function renderProfessionalArea(){
-    const ok = isProfessional();
-    if (priceEditor) priceEditor.style.display = ok ? 'block' : 'none';
-    if (profPass) profPass.value = '';
-    renderPricesEditor();
-  }
-
-  function renderPricesEditor(){
-    if (!pricesList) return;
-    const list = loadServices();
-    pricesList.innerHTML = '';
-    list.forEach(s=>{
-      const row = document.createElement('div');
-      row.className = 'price-row';
-      row.innerHTML = `<label>${escapeHtml(s.name)}<input data-id="${s.id}" class="priceInput" type="number" min="0" step="0.01" value="${s.price}" /></label>`;
-      pricesList.appendChild(row);
-    });
-    // se não for profissional, desabilitar inputs
-    const inputs = pricesList.querySelectorAll('.priceInput');
-    inputs.forEach(i=> i.disabled = !isProfessional());
-  }
-
-  savePricesBtn && savePricesBtn.addEventListener('click', ()=>{
-    if (!isProfessional()){ showResult('Apenas profissional pode salvar preços.'); return; }
-    const inputs = pricesList.querySelectorAll('.priceInput');
-    const list = loadServices();
-    inputs.forEach(inp=>{
-      const id = inp.getAttribute('data-id');
-      const s = list.find(x=>x.id===id);
-      if (s) s.price = parseFloat(inp.value) || 0;
-    });
-    saveServices(list);
-    renderServiceOptions();
-    showResult('Preços atualizados.');
+  if (savePricesBtn) savePricesBtn.addEventListener('click', () => {
+    if (!isProfessional()) { showResult('Apenas profissional pode salvar preços.'); return; }
+    const inputs = document.querySelectorAll('.priceInput'); const services = loadServices();
+    inputs.forEach(inp => { const id = inp.getAttribute('data-id'); const s = services.find(x=>x.id===id); if (s) s.price = parseFloat(inp.value) || 0; });
+    saveServices(services); renderServiceOptions(); showResult('Preços atualizados.');
   });
 
-
-  bookBtn.addEventListener('click', ()=>{
-    const u = getUserFromCookie();
-    const name = u ? u.name : (userName.value.trim() || 'Visitante');
-    const s = updatePriceDisplay();
-    const service = s ? s.name : serviceSelect.value;
-    const price = s ? s.price : 0;
-    const dt = dateTime.value;
-    if (!dt){ showResult('Escolha data e hora.'); return; }
-    const a = { id: Date.now().toString(), name, service, datetime: dt, price };
-    const list = loadAppointments();
-    list.push(a);
-    saveAppointments(list);
+  if (bookBtn) bookBtn.addEventListener('click', () => {
+    const u = getCookieObject('user'); const name = u ? u.name : (userName.value.trim() || 'Visitante');
+    const s = updatePriceDisplay(); const service = s ? s.name : (document.getElementById('serviceSelect')?.value || '');
+    const dt = document.getElementById('dateTime').value; if (!dt) { showResult('Escolha data e hora.'); return; }
+    const a = { id: Date.now().toString(), name, service, datetime: dt, price: s ? s.price : 0 };
+    const list = loadAppointments(); list.push(a); saveAppointments(list);
+    // Armazena o último agendamento em cookie 'lastAppointment' para referência rápida
     setCookie('lastAppointment', JSON.stringify({ service: a.service, datetime: a.datetime }), 30);
-    showResult('Agendamento salvo.');
-    renderAppointments();
+    showResult('Agendamento salvo.'); renderAppointments();
   });
 
-  // Inicialização
-  const theme = getCookie('theme');
-  if (theme) themeSelect.value = theme;
-  if (theme) document.documentElement.setAttribute('data-theme', theme);
-  renderUser();
-  renderAppointments();
-  // Cookies panel: opções de manipulação
-  const updateCookieBtn = document.getElementById('updateCookieBtn');
-  const deleteCookieBtn = document.getElementById('deleteCookieBtn');
-  const refreshCookiesBtn = document.getElementById('refreshCookiesBtn');
-
-  if (refreshCookiesBtn) refreshCookiesBtn.addEventListener('click', ()=> listCookies());
-
-  if (updateCookieBtn) updateCookieBtn.addEventListener('click', ()=>{
-    const name = document.getElementById('cookieNameEdit').value;
-    const value = document.getElementById('cookieValueEdit').value;
-    const days = document.getElementById('cookieDaysEdit').value || 0;
+  // botões de cookies
+  const refreshBtn = document.getElementById('refreshCookiesBtn'); if (refreshBtn) refreshBtn.addEventListener('click', listCookies);
+  const updateBtn = document.getElementById('updateCookieBtn'); if (updateBtn) updateBtn.addEventListener('click', () => {
+    const name = document.getElementById('cookieNameEdit').value; const value = document.getElementById('cookieValueEdit').value; const days = document.getElementById('cookieDaysEdit').value || 0;
     if (!name) { showResult('Nenhum cookie selecionado para atualizar.'); return; }
-    setCookie(name, value, days);
-    showResult(`Cookie "${name}" atualizado.`);
-    listCookies();
+    // Atualiza/Cria cookie manualmente via formulário de edição
+    setCookie(name, value, days); showResult(`Cookie "${name}" atualizado.`); listCookies();
   });
 
-  if (deleteCookieBtn) deleteCookieBtn.addEventListener('click', ()=>{
-    const name = document.getElementById('cookieNameEdit').value;
-    if (!name) { showResult('Nenhum cookie selecionado para excluir.'); return; }
-    deleteCookie(name);
-    showResult(`Cookie "${name}" excluído.`);
-    document.getElementById('cookieNameEdit').value = '';
-    document.getElementById('cookieValueEdit').value = '';
-    document.getElementById('cookieDaysEdit').value = '';
-    listCookies();
+  const deleteBtn = document.getElementById('deleteCookieBtn'); if (deleteBtn) deleteBtn.addEventListener('click', () => {
+    const name = document.getElementById('cookieNameEdit').value; if (!name) { showResult('Nenhum cookie selecionado para excluir.'); return; }
+    // Exclui cookie selecionado pelo formulário
+    deleteCookie(name); showResult(`Cookie "${name}" excluído.`); document.getElementById('cookieNameEdit').value=''; document.getElementById('cookieValueEdit').value=''; document.getElementById('cookieDaysEdit').value=''; listCookies();
   });
 
-  // Preencher lista inicial de cookies
-  listCookies();
-  // Inicializar serviços e área profissional
-  renderServiceOptions();
-  renderProfessionalArea();
+  // aplicar tema salvo
+  const storedTheme = getCookie('theme'); if (storedTheme && themeSelect) { themeSelect.value = storedTheme; document.documentElement.dataset.theme = storedTheme; }
+
+  // inicializações visuais
+  renderUser(); renderAppointments(); listCookies(); renderServiceOptions(); renderProfessionalArea();
 });

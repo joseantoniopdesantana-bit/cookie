@@ -2,84 +2,123 @@
 <html lang="pt-br">
 <head>
   <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Gerenciador de Cookies - Interface Simples</title>
-  <link rel="stylesheet" href="style.css">
+  <link rel="stylesheet" href="style.css" />
 </head>
 <body>
+  <!--
+    Main container: estrutura principal da aplicação.
+    Contém cabeçalho, painéis de formulário e área de interação.
+  -->
   <main class="container">
     <header class="hero">
       <h1>Clínica OdontoEstética</h1>
+      <!-- Descrição curta da aplicação exibida no topo -->
       <p>Gerencie agendamentos, preferências e sessão — utilizando cookies.</p>
     </header>
 
+    <!--
+      Painel de autenticação e perfil.
+      - `userName` e `userEmail` são usados para criar/mostrar o cookie de sessão.
+      - Botões controlam login, logout e limpeza de cookies.
+    -->
     <section class="panel" id="authPanel">
       <h2>Entrar / Perfil</h2>
-      <label>Nome do paciente
-        <input id="userName" placeholder="Seu nome" />
-      </label>
-      <label>E-mail
-        <input id="userEmail" placeholder="seu@exemplo.com" />
-      </label>
+
+      <label for="userName">Nome do paciente</label>
+      <input id="userName" type="text" placeholder="Seu nome" />
+
+      <label for="userEmail">E-mail</label>
+      <input id="userEmail" type="email" placeholder="seu@exemplo.com" />
+
       <div class="buttons">
-        <button id="loginBtn">Entrar</button>
-        <button id="logoutBtn" class="secondary">Sair</button>
-        <button id="clearCookiesBtn" class="danger">Limpar cookies</button>
+        <button id="loginBtn" type="button">Entrar</button>
+        <button id="logoutBtn" type="button" class="secondary">Sair</button>
+        <button id="clearCookiesBtn" type="button" class="danger">Limpar cookies</button>
       </div>
+
+      <!-- Área onde informações do usuário são exibidas dinamicamente -->
       <div id="userInfo" class="result"></div>
     </section>
 
+    <!--
+      Painel de preferências do usuário.
+      - Permite escolher tema (claro/escuro) e salvar em cookie.
+    -->
     <section class="panel" id="prefsPanel">
       <h2>Preferências</h2>
-      <label>Tema
-        <select id="themeSelect">
-          <option value="light">Claro</option>
-          <option value="dark">Escuro</option>
-        </select>
-      </label>
+
+      <label for="themeSelect">Tema</label>
+      <select id="themeSelect">
+        <option value="light">Claro</option>
+        <option value="dark">Escuro</option>
+      </select>
+
       <div class="buttons">
-        <button id="savePrefBtn">Salvar preferência</button>
+        <button id="savePrefBtn" type="button">Salvar preferência</button>
       </div>
     </section>
 
+    <!--
+      Painel de visualização e edição de cookies.
+      - `cookiesTable` exibe os cookies atuais do documento.
+      - Campos abaixo permitem editar um cookie selecionado.
+    -->
     <section class="panel" id="cookiesPanel">
       <h2>Cookies</h2>
+
+      <!-- Mensagens de status e ações (usadas por `showResult`) -->
       <div id="result" class="result"></div>
+
       <table>
         <thead>
-          <tr><th>Ação</th><th>Nome</th><th>Valor</th></tr>
+          <tr>
+            <th>Ação</th>
+            <th>Nome</th>
+            <th>Valor</th>
+          </tr>
         </thead>
         <tbody id="cookiesTable"></tbody>
       </table>
 
       <h3>Editar cookie</h3>
-      <label>Nome
-        <input id="cookieNameEdit" readonly />
-      </label>
-      <label>Valor
-        <input id="cookieValueEdit" />
-      </label>
-      <label>Expirar em (dias)
-        <input id="cookieDaysEdit" type="number" min="0" placeholder="7" />
-      </label>
+
+      <label for="cookieNameEdit">Nome</label>
+      <input id="cookieNameEdit" type="text" readonly />
+
+      <label for="cookieValueEdit">Valor</label>
+      <input id="cookieValueEdit" type="text" />
+
+      <label for="cookieDaysEdit">Expirar em (dias)</label>
+      <input id="cookieDaysEdit" type="number" min="0" placeholder="7" />
+
       <div class="buttons">
-        <button id="updateCookieBtn">Atualizar cookie</button>
-        <button id="deleteCookieBtn" class="danger">Excluir cookie</button>
-        <button id="refreshCookiesBtn" class="secondary">Atualizar lista</button>
+        <button id="updateCookieBtn" type="button">Atualizar cookie</button>
+        <button id="deleteCookieBtn" type="button" class="danger">Excluir cookie</button>
+        <button id="refreshCookiesBtn" type="button" class="secondary">Atualizar lista</button>
       </div>
     </section>
 
+    <!--
+      Painel de agendamento:
+      - `serviceSelect` contém os serviços disponíveis (carregados por JS).
+      - `servicePrice` mostra o preço do serviço selecionado.
+      - Ao clicar em `bookBtn` é criado um agendamento salvo em localStorage.
+    -->
     <section class="panel" id="bookingPanel">
       <h2>Agendar consulta</h2>
-      <label>Serviço
-        <select id="serviceSelect"></select>
-      </label>
+
+      <label for="serviceSelect">Serviço</label>
+      <select id="serviceSelect"></select>
+
       <div class="service-price">Preço: <span id="servicePrice">R$ 0,00</span></div>
-      <label>Data e hora
-        <input id="dateTime" type="datetime-local" />
-      </label>
+
+      <label for="dateTime">Data e hora</label>
+      <input id="dateTime" type="datetime-local" />
+
       <div class="buttons">
-        <button id="bookBtn">Agendar</button>
+        <button id="bookBtn" type="button">Agendar</button>
       </div>
     </section>
 
@@ -88,25 +127,34 @@
       <div id="appointmentsList" class="result">Nenhum agendamento.</div>
     </section>
 
+    <!--
+      Área restrita ao profissional:
+      - A autenticação é simbólica (senha simples) e salva uma role via cookie.
+      - Quando autenticado, o editor de preços fica visível para ajustar valores dos serviços.
+    -->
     <section class="panel" id="professionalPanel">
       <h2>Área do Profissional</h2>
-      <label>Senha do profissional
-        <input id="profPass" type="password" placeholder="senha" />
-      </label>
+
+      <label for="profPass">Senha do profissional</label>
+      <input id="profPass" type="password" placeholder="senha" />
+
       <div class="buttons">
-        <button id="profLoginBtn">Entrar como Profissional</button>
-        <button id="profLogoutBtn" class="secondary">Sair Profissional</button>
+        <button id="profLoginBtn" type="button">Entrar como Profissional</button>
+        <button id="profLogoutBtn" type="button" class="secondary">Sair Profissional</button>
       </div>
 
-      <div id="priceEditor" style="display:none;margin-top:12px">
+      <div id="priceEditor" class="hidden">
         <h3>Editar preços</h3>
         <div id="pricesList"></div>
-        <div class="buttons"><button id="savePricesBtn">Salvar preços</button></div>
+        <div class="buttons">
+          <button id="savePricesBtn" type="button">Salvar preços</button>
+        </div>
       </div>
     </section>
 
     <footer class="note">Abra este arquivo no navegador. Para testes locais, prefira servidor estático.</footer>
   </main>
+
   <script src="script.js"></script>
 </body>
 </html>
